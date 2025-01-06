@@ -3,6 +3,8 @@ import logging
 import cv2
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+import time
+import psycopg2
 from database import init_db, check_user_access, add_user, remove_user, get_all_users
 
 
