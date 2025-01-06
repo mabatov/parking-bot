@@ -32,7 +32,7 @@ wait_for_db()
 init_db()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = int(os.getenv("ADMIN_ID"))
+ADMIN_ID = os.getenv("ADMIN_ID")
 RTSP_URL = os.getenv("RTSP_URL")
 
 # Настройка логирования
