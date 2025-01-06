@@ -1,13 +1,15 @@
 FROM python:3.12-slim
 
-# Установка зависимостей для OpenCV и PostgreSQL
+# Установка системных зависимостей, необходимых для PostgreSQL и OpenCV
 RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     libglib2.0-0 \
+    gcc \
     postgresql-client \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Установка библиотек из requirements.txt
+# Установка Python-зависимостей
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
