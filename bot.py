@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 USER_KEYBOARD = ReplyKeyboardMarkup([["Получить фото 📸"]], resize_keyboard=True)
 
 
-async def start(update: Update, context) -> None:
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     username = update.effective_user.username
     logger.info(f"Команда /start от пользователя: {user_id} ({username})")
@@ -59,7 +59,7 @@ async def start(update: Update, context) -> None:
         await update.message.reply_text("У вас нет доступа к этому боту.")
 
 
-async def get_photo_from_rtsp() -> str:
+async def get_photo_from_rtsp(update: Update, context) -> None:
     cap = cv2.VideoCapture(RTSP_URL)
     ret, frame = cap.read()
     if ret:
