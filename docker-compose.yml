@@ -6,6 +6,8 @@ services:
     env_file: .env
     depends_on:
       - db
+    networks:
+      - parking_network
 
   db:
     image: postgres:15
@@ -15,3 +17,5 @@ services:
       POSTGRES_DB: parking_bot
     ports:
       - "5432:5432"
+    networks:
+      - parking_network
