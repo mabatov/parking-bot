@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.env
+.env
+*.sqlite3
+
+# Virtual environments
+env/
+venv/
+.venv/
+.Python
+
+# Logs
+*.log
+*.out
+*.err
+
+# Docker
+*.pid
+docker-compose.override.yml
+.dockerignore
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE и редакторы
+.vscode/
+.idea/
+*.iml
+
+# Test outputs
+.coverage
+.cache/
+.tox/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Git
+.git/
