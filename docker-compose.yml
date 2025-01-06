@@ -19,3 +19,7 @@ services:
       - "5432:5432"
     networks:
       - parking_network
+
+networks:
+  parking_network:
+    driver: bridge
