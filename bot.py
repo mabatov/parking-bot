@@ -59,17 +59,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text("У вас нет доступа к этому боту.")
 
 
-async def get_photo_from_rtsp(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def get_photo_from_rtsp():
     cap = cv2.VideoCapture(RTSP_URL)
+
+    if not cap.isOpened():
+        raise Exception("Не удалось открыть RTSP поток.")
+
     ret, frame = cap.read()
-    if ret:
-        photo_path = "current_parking.jpg"
-        cv2.imwrite(photo_path, frame)
-        # Отправка фото в чат
-        await context.bot.send_photo(chat_id=update.effective_chat.id, photo=open(photo_path, 'rb'))
-    else:
-        await update.message.reply_text("Не удалось получить фото.")
+    if not ret:
+        cap.release()
+        raise Exception("Не удалось получить кадр из потока.")
+
+    photo_path = "/path/to/photo.jpg"
+    cv2.imwrite(photo_path, frame)
     cap.release()
+
+    return photo_path
 
 
 async def handle_photo_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
