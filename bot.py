@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 USER_KEYBOARD = ReplyKeyboardMarkup([["Получить фото 📸"]], resize_keyboard=True)
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def start(update: Update, context) -> None:
     user_id = update.effective_user.id
     username = update.effective_user.username
     logger.info(f"Команда /start от пользователя: {user_id} ({username})")
@@ -60,25 +60,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def get_photo_from_rtsp() -> str:
-    """Забирает снимок с RTSP-потока и сохраняет в файл."""
-    temp_photo_path = "snapshot.jpg"
-    try:
-        cap = cv2.VideoCapture(RTSP_URL)
-        if not cap.isOpened():
-            raise ValueError("Не удалось открыть RTSP поток.")
-
-        ret, frame = cap.read()
-        cap.release()
-
-        if not ret:
-            raise ValueError("Не удалось получить кадр с видеопотока.")
-
-        # Сохраняем снимок во временный файл
-        cv2.imwrite(temp_photo_path, frame)
-        return temp_photo_path
-    except Exception as e:
-        logger.error(f"Ошибка получения фото с RTSP: {e}")
-        return None
+    cap = cv2.VideoCapture(RTSP_URL)
+    ret, frame = cap.read()
+    if ret:
+        photo_path = "current_parking.jpg"
+        cv2.imwrite(photo_path, frame)
+        # Отправка фото в чат
+        await context.bot.send_photo(chat_id=update.effective_chat.id, photo=open(photo_path, 'rb'))
+    else:
+        await update.message.reply_text("Не удалось получить фото.")
+    cap.release()
 
 
 async def handle_photo_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
