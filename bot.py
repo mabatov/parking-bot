@@ -5,9 +5,29 @@ from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 from database import init_db, check_user_access, add_user, remove_user, get_all_users
 
-# Вызовем функцию инициализации базы данных (создание таблиц)
-init_db()
 
+def wait_for_db():
+    while True:
+        try:
+            # Попытка подключиться к базе данных
+            conn = psycopg2.connect(
+                dbname="parking_bot",
+                user="postgres",
+                password="postgres",
+                host="db",
+                port="5432"
+            )
+            conn.close()  # Закрываем соединение, так как оно нам не нужно
+            break  # Если соединение прошло успешно, выходим из цикла
+        except psycopg2.OperationalError:
+            print("Waiting for database...")
+            time.sleep(5)  # Повторная попытка через 5 секунд
+
+# Ожидаем, пока база данных не станет доступна
+wait_for_db()
+
+# Теперь можно инициализировать БД
+init_db()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
