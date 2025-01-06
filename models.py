@@ -1,10 +1,8 @@
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer
+from flask_sqlalchemy import SQLAlchemy
 
-Base = declarative_base()
+db = SQLAlchemy()
 
-class User(Base):
-    __tablename__ = "users"
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    telegram_id = Column(db.Integer, unique=True, nullable=False)
 
-    id = Column(Integer, primary_key=True, index=True)
-    telegram_id = Column(Integer, unique=True, index=True)
