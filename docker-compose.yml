@@ -15,8 +15,6 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: parking_bot
-    ports:
-      - "5432:5432"
     networks:
       - parking_network
 
