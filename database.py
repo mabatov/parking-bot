@@ -11,8 +11,6 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 def init_db():
     Base.metadata.create_all(bind=engine)
 
-init_db()
-
 def check_user_access(user_id: int) -> bool:
     session = SessionLocal()
     user = session.query(User).filter(User.telegram_id == user_id).first()

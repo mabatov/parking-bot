@@ -3,7 +3,11 @@ import logging
 import cv2
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
-from database import check_user_access, add_user, remove_user, get_all_users
+from database import init_db, check_user_access, add_user, remove_user, get_all_users
+
+# Вызовем функцию инициализации базы данных (создание таблиц)
+init_db()
+
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
