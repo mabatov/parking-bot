@@ -1,21 +1,22 @@
-FROM python:3.12-slim
+FROM python:3.11-slim
 
-# Установка системных зависимостей, необходимых для PostgreSQL и OpenCV
+# Устанавливаем системные зависимости
 RUN apt-get update && apt-get install -y \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    gcc \
-    postgresql-client \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+    libpq-dev gcc ffmpeg libsm6 libxext6 && \
+    apt-get clean
 
-# Установка Python-зависимостей
+# Создаём рабочую директорию
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
 
-# Копирование файлов проекта
-COPY . /app
+# Копируем зависимости
+COPY requirements.txt requirements.txt
 
-# Команда для запуска приложения
-CMD ["python3", "bot.py"]
+# Устанавливаем зависимости проекта и OpenCV
+RUN pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir opencv-python-headless
+
+# Копируем код приложения
+COPY . .
+
+# Команда запуска
+CMD ["python", "bot.py"]
