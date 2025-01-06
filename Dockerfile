@@ -1,17 +1,18 @@
 # Используем базовый образ Python
 FROM python:3.12-slim
 
-# Устанавливаем рабочую директорию внутри контейнера
+# Устанавливаем необходимые зависимости для компиляции psycopg2
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Копируем проект в контейнер
 WORKDIR /app
+COPY . /app
 
-# Копируем файл зависимостей
-COPY requirements.txt .
-
-# Устанавливаем Python-зависимости
+# Устанавливаем зависимости
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Копируем весь проект в контейнер
-COPY . .
 
 # Указываем команду запуска приложения
 CMD ["python", "bot.py"]
