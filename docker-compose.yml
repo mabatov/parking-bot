@@ -6,6 +6,8 @@ services:
     env_file: .env
     depends_on:
       - db
+    networks:
+      - app_network
 
   db:
     image: postgres:15
@@ -13,3 +15,9 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: parking_bot
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge
