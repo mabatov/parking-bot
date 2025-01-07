@@ -60,10 +60,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def get_photo_from_rtsp():
-    logger.info(f"RTSP URL: {RTSP_URL}")
+    logger.info("Подключение к RTSP потоку...")
     cap = cv2.VideoCapture(RTSP_URL)
-
     if not cap.isOpened():
+        logger.error("Не удалось открыть RTSP поток.")
         raise Exception("Не удалось открыть RTSP поток.")
 
     ret, frame = cap.read()
