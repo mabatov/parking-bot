@@ -8,6 +8,8 @@ services:
       - db
     networks:
       - app_network
+    ports:
+      - "554:554"  # Проброс порта RTSP, если он доступен на хосте
 
   db:
     image: postgres:15
