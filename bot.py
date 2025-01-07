@@ -4,10 +4,8 @@ from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
 from config import config
-from database.connection import wait_for_db, session_maker
-from database.sql_operations import SqlOperations
-
-
+from database.connection import wait_for_db,get_async_session_maker
+from database.sql_operations_async import AsyncSqlOperations
 
 # Настройка логирования
 logging.basicConfig(
@@ -24,7 +22,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     username = update.effective_user.username
     logger.info(f"Команда /start от пользователя: {user_id} ({username})")
-    if sql_operations.check_user_access(user_id):
+    if await sql_operations.check_user_access(user_id):
         await update.message.reply_text(
             "Добро пожаловать! Нажмите на кнопку ниже, чтобы получить фото.",
             reply_markup=USER_KEYBOARD
@@ -56,7 +54,7 @@ async def handle_photo_request(update: Update, context: ContextTypes.DEFAULT_TYP
     user_id = update.effective_user.id
     username = update.effective_user.username
     logger.info(f"Запрос фото от пользователя: {user_id} ({username})")
-    if sql_operations.check_user_access(user_id):
+    if await sql_operations.check_user_access(user_id):
         photo_path = await get_photo_from_rtsp()
         if photo_path:
             await update.message.reply_photo(photo=open(photo_path, 'rb'))
@@ -76,7 +74,7 @@ async def add_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if user_id == config.admin_telegram_id:
         if context.args:
             new_user_id = int(context.args[0])
-            if sql_operations.add_user(new_user_id):
+            if await sql_operations.add_user(new_user_id):
                 await update.message.reply_text(f"Пользователь {new_user_id} добавлен.")
                 logger.info(f"Пользователь {new_user_id} ({username}) добавлен в список доступа.")
             else:
@@ -96,7 +94,7 @@ async def remove_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     if user_id == config.admin_telegram_id:
         if context.args:
             del_user_id = int(context.args[0])
-            if sql_operations.remove_user(del_user_id):
+            if await sql_operations.remove_user(del_user_id):
                 await update.message.reply_text(f"Пользователь {del_user_id} ({username}) удален.")
                 logger.info(f"Пользователь {del_user_id} ({username}) удален из списка доступа.")
             else:
@@ -114,9 +112,9 @@ async def list_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     username = update.effective_user.username
     logger.info(f"Команда /list_users от администратора: {user_id} ({username})")
     if user_id == config.admin_telegram_id:
-        users = sql_operations.get_all_users()
+        users = await sql_operations.get_all_users()
         if users:
-            user_list = "\n".join([str(user.telegram_id) for user in users])
+            user_list = "\n".join([str(user.get('telegram_id')) for user in users])
             await update.message.reply_text(f"Список пользователей:\n{user_list}")
             logger.info(f"Администратор запросил список пользователей. Количество: {len(users)}")
         else:
@@ -130,7 +128,7 @@ async def list_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
 if __name__ == "__main__":
     # Ожидаем, пока база данных не станет доступна
     wait_for_db()
-    sql_operations = SqlOperations(session_maker=session_maker)
+    sql_operations = AsyncSqlOperations(session_maker=get_async_session_maker)
 
     app = ApplicationBuilder().token(config.bot_token).build()
 
