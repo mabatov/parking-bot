@@ -1,39 +1,11 @@
-import os
 import logging
 import cv2
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
-import time
-import psycopg2
-from database import init_db, check_user_access, add_user, remove_user, get_all_users
 
-
-def wait_for_db():
-    while True:
-        try:
-            # Попытка подключиться к базе данных
-            conn = psycopg2.connect(
-                dbname="parking_bot",
-                user="postgres",
-                password="postgres",
-                host="db",
-                port="5432"
-            )
-            conn.close()  # Закрываем соединение, так как оно нам не нужно
-            break  # Если соединение прошло успешно, выходим из цикла
-        except psycopg2.OperationalError:
-            print("Waiting for database...")
-            time.sleep(5)  # Повторная попытка через 5 секунд
-
-# Ожидаем, пока база данных не станет доступна
-wait_for_db()
-
-# Теперь можно инициализировать БД
-init_db()
-
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = int(os.getenv("ADMIN_ID"))
-RTSP_URL = os.getenv("RTSP_URL")
+from config import config
+from database.connection import wait_for_db,get_async_session_maker
+from database.sql_operations_async import AsyncSqlOperations
 
 # Настройка логирования
 logging.basicConfig(
@@ -42,15 +14,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 # Клавиатура для пользователя
 USER_KEYBOARD = ReplyKeyboardMarkup([["Получить фото 📸"]], resize_keyboard=True)
-
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     username = update.effective_user.username
     logger.info(f"Команда /start от пользователя: {user_id} ({username})")
-    if check_user_access(user_id):
+    if await sql_operations.check_user_access(user_id):
         await update.message.reply_text(
             "Добро пожаловать! Нажмите на кнопку ниже, чтобы получить фото.",
             reply_markup=USER_KEYBOARD
@@ -61,7 +33,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def get_photo_from_rtsp():
     logger.info("Подключение к RTSP потоку...")
-    cap = cv2.VideoCapture(RTSP_URL)
+    cap = cv2.VideoCapture(config.rtsp_url)
     if not cap.isOpened():
         logger.error("Не удалось открыть RTSP поток.")
         raise Exception("Не удалось открыть RTSP поток.")
@@ -82,7 +54,7 @@ async def handle_photo_request(update: Update, context: ContextTypes.DEFAULT_TYP
     user_id = update.effective_user.id
     username = update.effective_user.username
     logger.info(f"Запрос фото от пользователя: {user_id} ({username})")
-    if check_user_access(user_id):
+    if await sql_operations.check_user_access(user_id):
         photo_path = await get_photo_from_rtsp()
         if photo_path:
             await update.message.reply_photo(photo=open(photo_path, 'rb'))
@@ -99,10 +71,10 @@ async def add_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     user_id = update.effective_user.id
     username = update.effective_user.username
     logger.info(f"Команда /add_user от администратора: {user_id} ({username})")
-    if user_id == ADMIN_ID:
+    if user_id == config.admin_telegram_id:
         if context.args:
             new_user_id = int(context.args[0])
-            if add_user(new_user_id):
+            if await sql_operations.add_user(new_user_id):
                 await update.message.reply_text(f"Пользователь {new_user_id} добавлен.")
                 logger.info(f"Пользователь {new_user_id} ({username}) добавлен в список доступа.")
             else:
@@ -119,10 +91,10 @@ async def remove_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     user_id = update.effective_user.id
     username = update.effective_user.username
     logger.info(f"Команда /remove_user от администратора: {user_id} ({username})")
-    if user_id == ADMIN_ID:
+    if user_id == config.admin_telegram_id:
         if context.args:
             del_user_id = int(context.args[0])
-            if remove_user(del_user_id):
+            if await sql_operations.remove_user(del_user_id):
                 await update.message.reply_text(f"Пользователь {del_user_id} ({username}) удален.")
                 logger.info(f"Пользователь {del_user_id} ({username}) удален из списка доступа.")
             else:
@@ -139,10 +111,10 @@ async def list_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_id = update.effective_user.id
     username = update.effective_user.username
     logger.info(f"Команда /list_users от администратора: {user_id} ({username})")
-    if user_id == ADMIN_ID:
-        users = get_all_users()
+    if user_id == config.admin_telegram_id:
+        users = await sql_operations.get_all_users()
         if users:
-            user_list = "\n".join([str(user.telegram_id) for user in users])
+            user_list = "\n".join([str(user.get('telegram_id')) for user in users])
             await update.message.reply_text(f"Список пользователей:\n{user_list}")
             logger.info(f"Администратор запросил список пользователей. Количество: {len(users)}")
         else:
@@ -154,7 +126,11 @@ async def list_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 if __name__ == "__main__":
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    # Ожидаем, пока база данных не станет доступна
+    wait_for_db()
+    sql_operations = AsyncSqlOperations(session_maker=get_async_session_maker)
+
+    app = ApplicationBuilder().token(config.bot_token).build()
 
     # Команды
     app.add_handler(CommandHandler("start", start))
