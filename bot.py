@@ -104,10 +104,10 @@ async def add_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             new_user_id = int(context.args[0])
             if add_user(new_user_id):
                 await update.message.reply_text(f"Пользователь {new_user_id} добавлен.")
-                logger.info(f"Пользователь {new_user_id} добавлен в список доступа.")
+                logger.info(f"Пользователь {new_user_id} ({username}) добавлен в список доступа.")
             else:
                 await update.message.reply_text("Этот пользователь уже есть в базе.")
-                logger.info(f"Пользователь {new_user_id} уже был в списке.")
+                logger.info(f"Пользователь {new_user_id} ({username}) уже был в списке.")
         else:
             await update.message.reply_text("Используйте: /add_user <id>")
     else:
@@ -123,11 +123,11 @@ async def remove_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         if context.args:
             del_user_id = int(context.args[0])
             if remove_user(del_user_id):
-                await update.message.reply_text(f"Пользователь {del_user_id} удален.")
-                logger.info(f"Пользователь {del_user_id} удален из списка доступа.")
+                await update.message.reply_text(f"Пользователь {del_user_id} ({username}) удален.")
+                logger.info(f"Пользователь {del_user_id} ({username}) удален из списка доступа.")
             else:
                 await update.message.reply_text("Этот пользователь не найден.")
-                logger.info(f"Пользователь {del_user_id} не найден в списке.")
+                logger.info(f"Пользователь {del_user_id} ({username}) не найден в списке.")
         else:
             await update.message.reply_text("Используйте: /remove_user <id>")
     else:
