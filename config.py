@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     db_port: str
     db_name: str
 
-    load_dotenv(find_dotenv('.env.example'))
+    load_dotenv(find_dotenv('.env'))
 
 
 config = Settings()

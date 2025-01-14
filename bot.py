@@ -1,22 +1,15 @@
-import logging
+from loguru import logger
 import cv2
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
 from config import config
-from database.connection import wait_for_db,get_async_session_maker
-from database.sql_operations_async import AsyncSqlOperations
-
-# Настройка логирования
-logging.basicConfig(
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
-
+from database.connection import wait_for_db, get_async_session_maker
+from database.sql_operations import SqlOperations
 
 # Клавиатура для пользователя
 USER_KEYBOARD = ReplyKeyboardMarkup([["Получить фото 📸"]], resize_keyboard=True)
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
@@ -128,7 +121,7 @@ async def list_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
 if __name__ == "__main__":
     # Ожидаем, пока база данных не станет доступна
     wait_for_db()
-    sql_operations = AsyncSqlOperations(session_maker=get_async_session_maker)
+    sql_operations = SqlOperations(session_maker=get_async_session_maker)
 
     app = ApplicationBuilder().token(config.bot_token).build()
 
