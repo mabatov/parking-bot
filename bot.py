@@ -80,9 +80,10 @@ async def add_user_command(message: types.Message):
     username = message.from_user.username
     logger.info(f"Команда /add_user от администратора: {user_id} ({username})")
     if user_id == config.admin_telegram_id:
-        if message.get_args():
+        args = message.text.split()
+        if len(args) > 1:
             try:
-                new_user_id = int(message.get_args())
+                new_user_id = int(args[1])
                 if await sql_operations.add_user(new_user_id):
                     await message.reply(f"Пользователь {new_user_id} добавлен.")
                     logger.info(f"Пользователь {new_user_id} добавлен в список доступа.")
@@ -104,9 +105,10 @@ async def remove_user_command(message: types.Message):
     username = message.from_user.username
     logger.info(f"Команда /remove_user от администратора: {user_id} ({username})")
     if user_id == config.admin_telegram_id:
-        if message.get_args():
+        args = message.text.split()
+        if len(args) > 1:
             try:
-                del_user_id = int(message.get_args())
+                del_user_id = int(args[1])
                 if await sql_operations.remove_user(del_user_id):
                     await message.reply(f"Пользователь {del_user_id} удален.")
                     logger.info(f"Пользователь {del_user_id} удален из списка доступа.")
