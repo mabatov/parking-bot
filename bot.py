@@ -1,13 +1,15 @@
 from loguru import logger
 import cv2
 from aiogram import Bot, Dispatcher, F, types
-from aiogram.types import ReplyKeyboardMarkup
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from config import config
 from database.connection import wait_for_db, async_session_maker
 from database.sql_operations import SqlOperations
 
 # Клавиатура для пользователя
-USER_KEYBOARD = ReplyKeyboardMarkup([["Получить фото 📸"]], resize_keyboard=True)
+USER_KEYBOARD = ReplyKeyboardMarkup(
+    keyboard=[[KeyboardButton(text="Получить фото 📸")]], resize_keyboard=True
+)
 
 # Инициализация операций с базой данных
 sql_operations = SqlOperations(session_maker=async_session_maker)
