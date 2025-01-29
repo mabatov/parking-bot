@@ -1,7 +1,11 @@
 from loguru import logger
 import cv2
-from aiogram import Bot, Dispatcher, F, types
+from aiogram import Bot, Dispatcher, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.fsm.context import FSMContext
+from aiogram.filters import Command, Text
+from aiogram import types
+
 from config import config
 from database.connection import wait_for_db, async_session_maker
 from database.sql_operations import SqlOperations
@@ -18,9 +22,9 @@ sql_operations = SqlOperations(session_maker=async_session_maker)
 bot = Bot(token=config.bot_token)
 dp = Dispatcher()
 
-
-@dp.message_handler(commands=["start"])
-async def start(message: types.Message):
+# Обработчик команды /start
+@dp.message(Command("start"))
+async def start(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     username = message.from_user.username
     logger.info(f"Команда /start от пользователя: {user_id} ({username})")
@@ -32,7 +36,7 @@ async def start(message: types.Message):
     else:
         await message.reply("У вас нет доступа к этому боту.")
 
-
+# Функция для получения фото с RTSP потока
 async def get_photo_from_rtsp():
     logger.info("Подключение к RTSP потоку...")
     cap = cv2.VideoCapture(config.rtsp_url)
@@ -51,8 +55,8 @@ async def get_photo_from_rtsp():
 
     return photo_path
 
-
-@dp.message_handler(F.text == "Получить фото 📸")
+# Обработчик запроса фото
+@dp.message(Text("Получить фото 📸"))
 async def handle_photo_request(message: types.Message):
     user_id = message.from_user.id
     username = message.from_user.username
@@ -70,8 +74,8 @@ async def handle_photo_request(message: types.Message):
         await message.reply("У вас нет доступа к фото.")
         logger.warning(f"Пользователь {user_id} ({username}) запросил фото, но не имеет доступа.")
 
-
-@dp.message_handler(commands=["add_user"])
+# Обработчик команды /add_user
+@dp.message(Command("add_user"))
 async def add_user_command(message: types.Message):
     user_id = message.from_user.id
     username = message.from_user.username
@@ -94,8 +98,8 @@ async def add_user_command(message: types.Message):
         await message.reply("У вас нет прав для выполнения этой команды.")
         logger.warning(f"Несанкционированная попытка добавления пользователя от {user_id} ({username})")
 
-
-@dp.message_handler(commands=["remove_user"])
+# Обработчик команды /remove_user
+@dp.message(Command("remove_user"))
 async def remove_user_command(message: types.Message):
     user_id = message.from_user.id
     username = message.from_user.username
@@ -118,8 +122,8 @@ async def remove_user_command(message: types.Message):
         await message.reply("У вас нет прав для выполнения этой команды.")
         logger.warning(f"Несанкционированная попытка удаления пользователя от {user_id} ({username})")
 
-
-@dp.message_handler(commands=["list_users"])
+# Обработчик команды /list_users
+@dp.message(Command("list_users"))
 async def list_users_command(message: types.Message):
     user_id = message.from_user.id
     username = message.from_user.username
@@ -137,13 +141,10 @@ async def list_users_command(message: types.Message):
         await message.reply("У вас нет прав для выполнения этой команды.")
         logger.warning(f"Несанкционированная попытка запроса списка пользователей от {user_id} ({username})")
 
-
 if __name__ == "__main__":
     # Ожидаем, пока база данных не станет доступна
     wait_for_db()
     logger.info("Бот запущен.")
-
-    # Запуск бота через Dispatcher
+    # Запуск бота через start_polling
     import asyncio
-
-    asyncio.run(dp.start_polling())
+    asyncio.run(dp.start_polling(bot))
