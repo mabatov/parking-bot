@@ -2,9 +2,8 @@ from loguru import logger
 import cv2
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-from aiogram.fsm.context import FSMContext
-from aiogram.filters import Command, Text
-from aiogram import types
+from aiogram.filters import Command
+from aiogram import F  # Для фильтрации по тексту
 
 from config import config
 from database.connection import wait_for_db, async_session_maker
@@ -24,7 +23,7 @@ dp = Dispatcher()
 
 # Обработчик команды /start
 @dp.message(Command("start"))
-async def start(message: types.Message, state: FSMContext):
+async def start(message: types.Message):
     user_id = message.from_user.id
     username = message.from_user.username
     logger.info(f"Команда /start от пользователя: {user_id} ({username})")
@@ -56,7 +55,7 @@ async def get_photo_from_rtsp():
     return photo_path
 
 # Обработчик запроса фото
-@dp.message(Text("Получить фото 📸"))
+@dp.message(F.text == "Получить фото 📸")  # Используем F.text для фильтра
 async def handle_photo_request(message: types.Message):
     user_id = message.from_user.id
     username = message.from_user.username
