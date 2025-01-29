@@ -1,9 +1,9 @@
 from loguru import logger
 import cv2
+import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.filters import Command
-from aiogram import F  # Для фильтрации по тексту
 
 from config import config
 from database.connection import wait_for_db, async_session_maker
@@ -35,27 +35,32 @@ async def start(message: types.Message):
     else:
         await message.reply("У вас нет доступа к этому боту.")
 
-# Функция для получения фото с RTSP потока
-async def get_photo_from_rtsp():
+# Синхронная функция получения фото
+def capture_rtsp_frame():
     logger.info("Подключение к RTSP потоку...")
     cap = cv2.VideoCapture(config.rtsp_url)
     if not cap.isOpened():
         logger.error("Не удалось открыть RTSP поток.")
-        raise Exception("Не удалось открыть RTSP поток.")
+        return None
 
     ret, frame = cap.read()
+    cap.release()
+
     if not ret:
-        cap.release()
-        raise Exception("Не удалось получить кадр из потока.")
+        logger.error("Не удалось получить кадр из потока.")
+        return None
 
     photo_path = "photo.jpg"
     cv2.imwrite(photo_path, frame)
-    cap.release()
-
     return photo_path
 
+# Асинхронный вызов синхронной функции
+async def get_photo_from_rtsp():
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, capture_rtsp_frame)
+
 # Обработчик запроса фото
-@dp.message(F.text == "Получить фото 📸")  # Используем F.text для фильтра
+@dp.message(lambda message: message.text == "Получить фото 📸")
 async def handle_photo_request(message: types.Message):
     user_id = message.from_user.id
     username = message.from_user.username
@@ -63,89 +68,21 @@ async def handle_photo_request(message: types.Message):
     if await sql_operations.check_user_access(user_id):
         try:
             photo_path = await get_photo_from_rtsp()
-            with open(photo_path, 'rb') as photo:
-                await message.answer_photo(photo)
-            logger.info(f"Фото отправлено пользователю: {user_id} ({username})")
+            if photo_path:
+                with open(photo_path, 'rb') as photo:
+                    await message.answer_photo(photo)
+                logger.info(f"Фото отправлено пользователю: {user_id} ({username})")
+            else:
+                await message.reply("Не удалось получить фото с камеры.")
+                logger.warning(f"Ошибка получения фото для {user_id} ({username})")
         except Exception as e:
             await message.reply("Не удалось получить фото с камеры.")
-            logger.warning(f"Не удалось отправить фото пользователю: {user_id} ({username}). Ошибка: {e}")
+            logger.warning(f"Ошибка при отправке фото пользователю {user_id} ({username}): {e}")
     else:
         await message.reply("У вас нет доступа к фото.")
         logger.warning(f"Пользователь {user_id} ({username}) запросил фото, но не имеет доступа.")
 
-# Обработчик команды /add_user
-@dp.message(Command("add_user"))
-async def add_user_command(message: types.Message):
-    user_id = message.from_user.id
-    username = message.from_user.username
-    logger.info(f"Команда /add_user от администратора: {user_id} ({username})")
-    if user_id == config.admin_telegram_id:
-        args = message.text.split()
-        if len(args) > 1:
-            try:
-                new_user_id = int(args[1])
-                if await sql_operations.add_user(new_user_id):
-                    await message.reply(f"Пользователь {new_user_id} добавлен.")
-                    logger.info(f"Пользователь {new_user_id} добавлен в список доступа.")
-                else:
-                    await message.reply("Этот пользователь уже есть в базе.")
-                    logger.info(f"Пользователь {new_user_id} уже был в списке.")
-            except ValueError:
-                await message.reply("Пожалуйста, укажите корректный ID пользователя.")
-        else:
-            await message.reply("Используйте: /add_user <id>")
-    else:
-        await message.reply("У вас нет прав для выполнения этой команды.")
-        logger.warning(f"Несанкционированная попытка добавления пользователя от {user_id} ({username})")
-
-# Обработчик команды /remove_user
-@dp.message(Command("remove_user"))
-async def remove_user_command(message: types.Message):
-    user_id = message.from_user.id
-    username = message.from_user.username
-    logger.info(f"Команда /remove_user от администратора: {user_id} ({username})")
-    if user_id == config.admin_telegram_id:
-        args = message.text.split()
-        if len(args) > 1:
-            try:
-                del_user_id = int(args[1])
-                if await sql_operations.remove_user(del_user_id):
-                    await message.reply(f"Пользователь {del_user_id} удален.")
-                    logger.info(f"Пользователь {del_user_id} удален из списка доступа.")
-                else:
-                    await message.reply("Этот пользователь не найден.")
-                    logger.info(f"Пользователь {del_user_id} не найден в списке.")
-            except ValueError:
-                await message.reply("Пожалуйста, укажите корректный ID пользователя.")
-        else:
-            await message.reply("Используйте: /remove_user <id>")
-    else:
-        await message.reply("У вас нет прав для выполнения этой команды.")
-        logger.warning(f"Несанкционированная попытка удаления пользователя от {user_id} ({username})")
-
-# Обработчик команды /list_users
-@dp.message(Command("list_users"))
-async def list_users_command(message: types.Message):
-    user_id = message.from_user.id
-    username = message.from_user.username
-    logger.info(f"Команда /list_users от администратора: {user_id} ({username})")
-    if user_id == config.admin_telegram_id:
-        users = await sql_operations.get_all_users()
-        if users:
-            user_list = "\n".join([str(user.get('telegram_id')) for user in users])
-            await message.reply(f"Список пользователей:\n{user_list}")
-            logger.info(f"Администратор запросил список пользователей. Количество: {len(users)}")
-        else:
-            await message.reply("Список пользователей пуст.")
-            logger.info("Список пользователей пуст.")
-    else:
-        await message.reply("У вас нет прав для выполнения этой команды.")
-        logger.warning(f"Несанкционированная попытка запроса списка пользователей от {user_id} ({username})")
-
 if __name__ == "__main__":
-    # Ожидаем, пока база данных не станет доступна
     wait_for_db()
     logger.info("Бот запущен.")
-    # Запуск бота через start_polling
-    import asyncio
     asyncio.run(dp.start_polling(bot))
