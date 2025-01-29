@@ -67,7 +67,7 @@ def get_photo_from_rtsp_sync():
 
 async def get_photo_from_rtsp():
     """Асинхронный вызов синхронной функции с OpenCV"""
-    loop = asyncio.get_running_loop()
+    loop = asyncio.get_event_loop()
     return await loop.run_in_executor(executor, get_photo_from_rtsp_sync)
 
 
