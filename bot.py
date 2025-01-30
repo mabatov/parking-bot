@@ -1,9 +1,11 @@
+import functools
+
 from loguru import logger
 import cv2
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InputFile, FSInputFile
 from aiogram.filters import Command
 from aiogram import F
 
@@ -26,6 +28,14 @@ dp = Dispatcher()
 # Пул потоков для работы с OpenCV
 executor = ThreadPoolExecutor(max_workers=1)
 
+def async_decorator(func):  # собственно сама обертка
+    @functools.wraps(func)
+    async def wrapper(*args, **kwargs):
+        loops = asyncio.get_running_loop()  # тут я на тебя нагнал, а у тебя было RUNNING_loop, погнал не по делу
+        with ThreadPoolExecutor(max_workers=5) as pool:
+            return await loops.run_in_executor(pool, func, *args)
+
+    return wrapper
 
 async def start(message: types.Message):
     """Обработчик команды /start"""
@@ -42,7 +52,7 @@ async def start(message: types.Message):
 
 dp.message.register(start, Command("start"))
 
-
+@async_decorator
 def get_photo_from_rtsp_sync():
     """Синхронная функция для получения кадра из RTSP-потока"""
     logger.info("Подключение к RTSP потоку...")
@@ -79,10 +89,9 @@ async def handle_photo_request(message: types.Message):
 
     if await sql_operations.check_user_access(user_id):
         try:
-            photo_path = await get_photo_from_rtsp()
+            photo_path = await get_photo_from_rtsp_sync()
             if photo_path:
-                with open(photo_path, 'rb') as photo:
-                    await message.answer_photo(photo)
+                await message.answer_photo(FSInputFile(photo_path), caption='caption')
                 logger.info(f"Фото отправлено пользователю: {user_id} ({username})")
             else:
                 await message.reply("Ошибка при получении фото.")
