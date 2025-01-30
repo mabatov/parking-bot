@@ -1,9 +1,10 @@
+import functools
 from loguru import logger
 import cv2
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, FSInputFile
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.filters import Command
 from aiogram import F
 
@@ -43,6 +44,16 @@ async def start(message: types.Message):
 dp.message.register(start, Command("start"))
 
 
+def async_decorator(func):
+    @functools.wraps(func)
+    async def wrapper(*args, **kwargs):
+        loops = asyncio.get_running_loop()
+        with ThreadPoolExecutor(max_workers=5) as pool:
+            return await loops.run_in_executor(pool, func, *args)
+
+    return wrapper
+
+@async_decorator
 def get_photo_from_rtsp_sync():
     """Синхронная функция для получения кадра из RTSP-потока"""
     logger.info("Подключение к RTSP потоку...")
@@ -81,7 +92,8 @@ async def handle_photo_request(message: types.Message):
         try:
             photo_path = await get_photo_from_rtsp()
             if photo_path:
-                await message.answer_photo(FSInputFile(photo_path))
+                with open(photo_path, 'rb') as photo:
+                    await message.answer_photo(photo)
                 logger.info(f"Фото отправлено пользователю: {user_id} ({username})")
             else:
                 await message.reply("Ошибка при получении фото.")
