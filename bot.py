@@ -24,7 +24,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text("У вас нет доступа к этому боту.")
 
 
-async def get_photo_from_rtsp():
+def get_photo_from_rtsp():
     logger.info("Подключение к RTSP потоку...")
 
     cap = cv2.VideoCapture(config.rtsp_url)
