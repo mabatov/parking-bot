@@ -1,5 +1,5 @@
 from loguru import logger
-import cv2
+import subprocess
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
@@ -25,22 +25,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def get_photo_from_rtsp():
-    logger.info("Подключение к RTSP потоку...")
-    cap = cv2.VideoCapture(config.rtsp_url)
-    if not cap.isOpened():
-        logger.error("Не удалось открыть RTSP поток.")
-        raise Exception("Не удалось открыть RTSP поток.")
-
-    ret, frame = cap.read()
-    if not ret:
-        cap.release()
-        raise Exception("Не удалось получить кадр из потока.")
-
-    photo_path = "photo.jpg"
-    cv2.imwrite(photo_path, frame)
-    cap.release()
-
-    return photo_path
+    rtsp_url = config.rtsp_url
+    output_path = "/photo.jpg"  # Путь к файлу
+    try:
+        logger.info("Подключение к RTSP потоку...")
+        result = subprocess.run(
+            ["ffmpeg", "-rtsp_transport", "tcp", "-i", rtsp_url, "-vframes", "1", output_path, "-y"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        return output_path
+    except subprocess.CalledProcessError as e:
+        raise Exception(f"Ошибка при получении кадра через ffmpeg: {e.stderr.decode()}")
 
 
 async def handle_photo_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
