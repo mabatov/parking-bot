@@ -28,6 +28,7 @@ async def get_photo_from_rtsp():
     rtsp_url = config.rtsp_url
     output_path = "/photo.jpg"  # Путь к файлу
     try:
+        logger.info("Подключение к RTSP потоку...")
         result = subprocess.run(
             ["ffmpeg", "-rtsp_transport", "tcp", "-i", rtsp_url, "-vframes", "1", output_path, "-y"],
             check=True,
