@@ -31,7 +31,9 @@ async def get_photo_from_rtsp():
         logger.info("Подключение к RTSP потоку...")
         result = subprocess.run(
             [
-                "ffmpeg", "-rtsp_transport", "tcp", "-i", rtsp_url,  # Подключаемся к камере
+                "ffmpeg", "-y" # Подтверждение перезаписи файла
+                "-rtsp_transport", "tcp", # Захват RTSP-видеопотока по TCP
+                "-i", rtsp_url,  # Подключаемся к камере
                 "-frames:v", "1",  # Записываем только один кадр
                 "-q:v", "1",  # Устанавливаем наилучшее качество JPEG (диапазон 1-31, где 1 — наилучшее)
                 "-vf", "scale=iw*2:ih*2",  # Удваиваем разрешение для повышения детализации
