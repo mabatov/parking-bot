@@ -5,6 +5,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     admin_telegram_id: int
     bot_token: str
+    logging_bot_token: str
     rtsp_url: str
 
     db_user: str

@@ -31,6 +31,7 @@ cd parking-bot
 Create an `.env` file with the following variables:  
 ```ini
 bot_token=your_telegram_bot_token
+logging_bot_token=your_logging_telegram_bot_token
 rtsp_url=rtsp://user:password@camera-ip:port/stream1
 admin_telegram_id=telegram_id_of_admin
 

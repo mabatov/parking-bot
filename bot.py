@@ -1,6 +1,6 @@
 from loguru import logger
 import subprocess
-from telegram import Update, ReplyKeyboardMarkup
+from telegram import Update, ReplyKeyboardMarkup, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
 from config import config
@@ -14,7 +14,11 @@ USER_KEYBOARD = ReplyKeyboardMarkup([["Получить фото 📸"]], resize
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     username = update.effective_user.username
-    logger.info(f"Команда /start от пользователя: {user_id}")
+
+    log_msg = f"Команда /start от пользователя: {user_id} @{username}"
+    logger.info(log_msg)
+    await send_log(log_msg)
+
     if await sql_operations.check_user_access(user_id):
         await update.message.reply_text(
             "Добро пожаловать! Нажмите на кнопку ниже, чтобы получить фото.",
@@ -22,6 +26,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
     else:
         await update.message.reply_text("У вас нет доступа к этому боту.")
+        await send_log(f"У пользователя нет доступа: {user_id} @{username}")
 
 
 async def get_photo_from_rtsp():
@@ -52,18 +57,29 @@ async def get_photo_from_rtsp():
 async def handle_photo_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     username = update.effective_user.username
-    logger.info(f"Запрос фото от пользователя: {user_id}")
+
+    log_msg = f"Запрос фото от пользователя: {user_id} @{username}"
+    logger.info(log_msg)
+    await send_log(log_msg)
+
     if await sql_operations.check_user_access(user_id):
         photo_path = await get_photo_from_rtsp()
         if photo_path:
             await update.message.reply_photo(photo=open(photo_path, 'rb'))
-            logger.info(f"Фото отправлено пользователю: {user_id}")
+            log_msg = f"Фото отправлено пользователю: {user_id} @{username}"
+            logger.info(log_msg)
+            await send_log(log_msg)
+
         else:
             await update.message.reply_text("Не удалось получить фото с камеры.")
-            logger.warning(f"Не удалось отправить фото пользователю: {user_id}")
+            log_msg = f"Не удалось отправить фото пользователю: {user_id} @{username}"
+            logger.warning(log_msg)
+            await send_log(log_msg)
     else:
         await update.message.reply_text("У вас нет доступа к фото.")
-        logger.warning(f"Пользователь {user_id} запросил фото, но не имеет доступа.")
+        log_msg = f"Пользователь {user_id} @{username} запросил фото, но не имеет доступа."
+        logger.warning(log_msg)
+        await send_log(log_msg)
 
 
 async def add_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -75,15 +91,21 @@ async def add_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             new_user_id = int(context.args[0])
             if await sql_operations.add_user(new_user_id):
                 await update.message.reply_text(f"Пользователь {new_user_id} добавлен.")
-                logger.info(f"Пользователь {new_user_id} добавлен в список доступа.")
+                log_msg = f"Пользователь {new_user_id} добавлен в список доступа."
+                logger.info(log_msg)
+                await send_log(log_msg)
             else:
                 await update.message.reply_text("Этот пользователь уже есть в базе.")
-                logger.info(f"Пользователь {new_user_id} уже был в списке.")
+                log_msg = f"Пользователь {new_user_id} уже был в списке."
+                logger.info(log_msg)
+                await send_log(log_msg)
         else:
             await update.message.reply_text("Используйте: /add_user <id>")
     else:
         await update.message.reply_text("У вас нет прав для выполнения этой команды.")
-        logger.warning(f"Несанкционированная попытка добавления пользователя от {user_id}")
+        log_msg = f"Несанкционированная попытка добавления пользователя от {user_id}"
+        logger.warning(log_msg)
+        await send_log(log_msg)
 
 
 async def remove_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -95,33 +117,55 @@ async def remove_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             del_user_id = int(context.args[0])
             if await sql_operations.remove_user(del_user_id):
                 await update.message.reply_text(f"Пользователь {del_user_id} удален.")
-                logger.info(f"Пользователь {del_user_id} удален из списка доступа.")
+                log_msg = f"Пользователь {del_user_id} удален из списка доступа."
+                logger.info(log_msg)
+                await send_log(log_msg)
             else:
                 await update.message.reply_text("Этот пользователь не найден.")
-                logger.info(f"Пользователь {del_user_id} не найден в списке.")
+                log_msg = f"Пользователь {del_user_id} не найден в списке."
+                logger.info(log_msg)
+                await send_log(log_msg)
         else:
             await update.message.reply_text("Используйте: /remove_user <id>")
     else:
         await update.message.reply_text("У вас нет прав для выполнения этой команды.")
-        logger.warning(f"Несанкционированная попытка удаления пользователя от {user_id}")
+        log_msg = f"Несанкционированная попытка удаления пользователя от {user_id} @{username}"
+        logger.warning(log_msg)
+        await send_log(log_msg)
 
 
 async def list_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     username = update.effective_user.username
-    logger.info(f"Команда /list_users от администратора: {user_id}")
+    log_msg = f"Команда /list_users от администратора: {user_id} @{username}"
+    logger.info(log_msg)
+    await send_log(log_msg)
     if user_id == config.admin_telegram_id:
         users = await sql_operations.get_all_users()
         if users:
             user_list = "\n".join([str(user.get('telegram_id')) for user in users])
             await update.message.reply_text(f"Список пользователей:\n{user_list}")
-            logger.info(f"Администратор запросил список пользователей. Количество: {len(users)}")
+            log_msg = f"Администратор запросил список пользователей. Количество: {len(users)}"
+            logger.info(log_msg)
+            await send_log(log_msg)
         else:
             await update.message.reply_text("Список пользователей пуст.")
-            logger.info("Список пользователей пуст.")
+            log_msg = f"Список пользователей пуст."
+            logger.info(log_msg)
+            await send_log(log_msg)
     else:
         await update.message.reply_text("У вас нет прав для выполнения этой команды.")
-        logger.warning(f"Несанкционированная попытка запроса списка пользователей от {user_id}")
+        log_msg = f"Несанкционированная попытка запроса списка пользователей от {user_id} @{username}"
+        logger.warning(log_msg)
+        await send_log(log_msg)
+
+async def send_log(message: str):
+    log_bot = Bot(token=config.logging_bot_token)
+    log_chat_id = config.admin_telegram_id
+    try:
+        await log_bot.send_message(chat_id=log_chat_id, text=f"[LOG] {message}")
+    except Exception as e:
+        logger.warning(f"Не удалось отправить лог в лог-бота: {e}")
 
 
 if __name__ == "__main__":
