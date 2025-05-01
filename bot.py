@@ -15,7 +15,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     username = update.effective_user.username
 
-    log_msg = f"Команда /start от пользователя: {user_id} {username}"
+    log_msg = f"Команда /start от пользователя: {user_id} @{username}"
     logger.info(log_msg)
     await send_log(log_msg)
 
@@ -26,7 +26,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
     else:
         await update.message.reply_text("У вас нет доступа к этому боту.")
-        await send_log(f"У пользователя нет доступа: {user_id} {username}")
+        await send_log(f"У пользователя нет доступа: {user_id} @{username}")
 
 
 async def get_photo_from_rtsp():
@@ -58,7 +58,7 @@ async def handle_photo_request(update: Update, context: ContextTypes.DEFAULT_TYP
     user_id = update.effective_user.id
     username = update.effective_user.username
 
-    log_msg = f"Запрос фото от пользователя: {user_id} {username}"
+    log_msg = f"Запрос фото от пользователя: {user_id} @{username}"
     logger.info(log_msg)
     await send_log(log_msg)
 
@@ -66,18 +66,18 @@ async def handle_photo_request(update: Update, context: ContextTypes.DEFAULT_TYP
         photo_path = await get_photo_from_rtsp()
         if photo_path:
             await update.message.reply_photo(photo=open(photo_path, 'rb'))
-            log_msg = f"Фото отправлено пользователю: {user_id} {username}"
+            log_msg = f"Фото отправлено пользователю: {user_id} @{username}"
             logger.info(log_msg)
             await send_log(log_msg)
 
         else:
             await update.message.reply_text("Не удалось получить фото с камеры.")
-            log_msg = f"Не удалось отправить фото пользователю: {user_id} {username}"
+            log_msg = f"Не удалось отправить фото пользователю: {user_id} @{username}"
             logger.warning(log_msg)
             await send_log(log_msg)
     else:
         await update.message.reply_text("У вас нет доступа к фото.")
-        log_msg = f"Пользователь {user_id} {username} запросил фото, но не имеет доступа."
+        log_msg = f"Пользователь {user_id} @{username} запросил фото, но не имеет доступа."
         logger.warning(log_msg)
         await send_log(log_msg)
 
@@ -129,7 +129,7 @@ async def remove_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             await update.message.reply_text("Используйте: /remove_user <id>")
     else:
         await update.message.reply_text("У вас нет прав для выполнения этой команды.")
-        log_msg = f"Несанкционированная попытка удаления пользователя от {user_id} {username}"
+        log_msg = f"Несанкционированная попытка удаления пользователя от {user_id} @{username}"
         logger.warning(log_msg)
         await send_log(log_msg)
 
@@ -137,7 +137,7 @@ async def remove_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def list_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     username = update.effective_user.username
-    log_msg = f"Команда /list_users от администратора: {user_id} {username}"
+    log_msg = f"Команда /list_users от администратора: {user_id} @{username}"
     logger.info(log_msg)
     await send_log(log_msg)
     if user_id == config.admin_telegram_id:
@@ -155,7 +155,7 @@ async def list_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await send_log(log_msg)
     else:
         await update.message.reply_text("У вас нет прав для выполнения этой команды.")
-        log_msg = f"Несанкционированная попытка запроса списка пользователей от {user_id} {username}"
+        log_msg = f"Несанкционированная попытка запроса списка пользователей от {user_id} @{username}"
         logger.warning(log_msg)
         await send_log(log_msg)
 
