@@ -1,6 +1,6 @@
 from loguru import logger
 import subprocess
-from telegram import Update, ReplyKeyboardMarkup
+from telegram import Update, ReplyKeyboardMarkup, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
 from config import config
@@ -160,7 +160,7 @@ async def list_users_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await send_log(log_msg)
 
 async def send_log(message: str):
-    log_bot = config.logging_bot_token
+    log_bot = Bot(token=config.logging_bot_token)
     log_chat_id = config.admin_telegram_id
     try:
         await log_bot.send_message(chat_id=log_chat_id, text=f"[LOG] {message}")
