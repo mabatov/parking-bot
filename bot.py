@@ -1,14 +1,24 @@
+import asyncio
+import io
+import time
+
 from loguru import logger
-import subprocess
 from telegram import Update, ReplyKeyboardMarkup, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
+from camera import CameraError, capture_frame
 from config import config
 from database.connection import wait_for_db, get_async_session_maker
 from database.sql_operations import SqlOperations
+from parking_analysis import AnalysisError, analyze_parking, prepare_image, render_result
 
 # Клавиатура для пользователя
-USER_KEYBOARD = ReplyKeyboardMarkup([["Получить фото 📸"]], resize_keyboard=True)
+buttons = ["Получить фото 📸"]
+if config.openai_api_key:
+    buttons.append("Найти места 🅿️")
+USER_KEYBOARD = ReplyKeyboardMarkup([buttons], resize_keyboard=True)
+parking_lock = asyncio.Lock()
+last_analysis_at = float("-inf")
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -21,37 +31,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if await sql_operations.check_user_access(user_id):
         await update.message.reply_text(
-            "Добро пожаловать! Нажмите на кнопку ниже, чтобы получить фото.",
+            "Добро пожаловать! Можно получить фото или оценить занятость парковки.",
             reply_markup=USER_KEYBOARD
         )
     else:
         await update.message.reply_text("У вас нет доступа к этому боту.")
         await send_log(f"У пользователя нет доступа: {user_id} @{username}")
-
-
-async def get_photo_from_rtsp():
-    rtsp_url = config.rtsp_url
-    output_path = "/photo.jpg"  # Путь к файлу
-    try:
-        logger.info("Подключение к RTSP потоку...")
-        result = subprocess.run(
-            [
-                "ffmpeg", "-y", # Подтверждение перезаписи файла
-                "-rtsp_transport", "tcp", # Захват RTSP-видеопотока по TCP
-                "-i", rtsp_url,  # Подключаемся к камере
-                "-frames:v", "1",  # Записываем только один кадр
-                "-q:v", "1",  # Устанавливаем наилучшее качество JPEG (диапазон 1-31, где 1 — наилучшее)
-                "-vf", "scale=iw*2:ih*2",  # Удваиваем разрешение для повышения детализации
-                "-pix_fmt", "yuvj422p",  # Используем цветовое пространство с меньшим сжатием
-                output_path  # Имя выходного файла
-            ],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
-        return output_path
-    except subprocess.CalledProcessError as e:
-        raise Exception(f"Ошибка при получении кадра через ffmpeg: {e.stderr.decode()}")
 
 
 async def handle_photo_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -62,24 +47,71 @@ async def handle_photo_request(update: Update, context: ContextTypes.DEFAULT_TYP
     logger.info(log_msg)
     await send_log(log_msg)
 
-    if await sql_operations.check_user_access(user_id):
-        photo_path = await get_photo_from_rtsp()
-        if photo_path:
-            await update.message.reply_photo(photo=open(photo_path, 'rb'))
-            log_msg = f"Фото отправлено пользователю: {user_id} @{username}"
-            logger.info(log_msg)
-            await send_log(log_msg)
-
-        else:
-            await update.message.reply_text("Не удалось получить фото с камеры.")
-            log_msg = f"Не удалось отправить фото пользователю: {user_id} @{username}"
-            logger.warning(log_msg)
-            await send_log(log_msg)
-    else:
+    if not await sql_operations.check_user_access(user_id):
         await update.message.reply_text("У вас нет доступа к фото.")
         log_msg = f"Пользователь {user_id} @{username} запросил фото, но не имеет доступа."
         logger.warning(log_msg)
         await send_log(log_msg)
+        return
+
+    try:
+        frame = await capture_frame(upscale=True)
+        with io.BytesIO(frame) as photo:
+            photo.name = "photo.jpg"
+            await update.message.reply_photo(photo=photo)
+    except CameraError as exc:
+        await update.message.reply_text(str(exc))
+        logger.warning("Ошибка камеры при отправке фото: {}", type(exc).__name__)
+        return
+
+    log_msg = f"Фото отправлено пользователю: {user_id} @{username}"
+    logger.info(log_msg)
+    await send_log(log_msg)
+
+
+async def handle_parking_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    global last_analysis_at
+
+    user_id = update.effective_user.id
+    if not await sql_operations.check_user_access(user_id):
+        await update.message.reply_text("У вас нет доступа к снимкам парковки.")
+        return
+    if not config.openai_api_key:
+        await update.message.reply_text("Анализ парковки ещё не настроен: нужен ключ OpenAI API.")
+        return
+    if parking_lock.locked():
+        await update.message.reply_text("Сейчас обрабатывается другой кадр. Попробуйте чуть позже.")
+        return
+
+    async with parking_lock:
+        remaining = config.parking_cooldown_seconds - (time.monotonic() - last_analysis_at)
+        if remaining > 0:
+            await update.message.reply_text(f"Новый анализ будет доступен через {int(remaining) + 1} с.")
+            return
+        await update.message.reply_text("Получаю кадр и проверяю парковку…")
+        try:
+            frame = await capture_frame()
+            image = prepare_image(frame)
+            last_analysis_at = time.monotonic()
+            analysis = await analyze_parking(image, config.openai_api_key, config.openai_model)
+            if not analysis.spaces:
+                await update.message.reply_text("На этом кадре не удалось выделить парковочные места. Попробуйте другой ракурс или освещение.")
+                return
+
+            photo = render_result(image, analysis)
+            free, occupied, unknown = (analysis.count(status) for status in ("free", "occupied", "unknown"))
+            caption = (f"Оценка по кадру: 🟢 свободно {free}, "
+                       f"🔴 занято {occupied}, 🟡 неясно {unknown}. "
+                       "Проверьте подсвеченные места на снимке.")
+            if analysis.note:
+                caption += f"\n{analysis.note}"
+            with io.BytesIO(photo) as output:
+                output.name = "parking.jpg"
+                await update.message.reply_photo(photo=output, caption=caption[:1000])
+            await send_log(f"Анализ парковки для {user_id}: свободно {free}, занято {occupied}, неясно {unknown}")
+        except (CameraError, AnalysisError) as exc:
+            logger.warning("Анализ парковки завершился ошибкой: {}", type(exc).__name__)
+            await update.message.reply_text(str(exc))
 
 
 async def add_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -173,16 +205,19 @@ if __name__ == "__main__":
     wait_for_db()
     sql_operations = SqlOperations(session_maker=get_async_session_maker)
 
-    app = ApplicationBuilder().token(config.bot_token).build()
+    app = ApplicationBuilder().token(config.bot_token).concurrent_updates(4).build()
 
     # Команды
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("photo", handle_photo_request))
+    app.add_handler(CommandHandler("parking", handle_parking_request))
     app.add_handler(CommandHandler("add_user", add_user_command))
     app.add_handler(CommandHandler("remove_user", remove_user_command))
     app.add_handler(CommandHandler("list_users", list_users_command))
 
     # Обработка кнопки "Получить фото"
     app.add_handler(MessageHandler(filters.Text("Получить фото 📸"), handle_photo_request))
+    app.add_handler(MessageHandler(filters.Text("Найти места 🅿️"), handle_parking_request))
 
     logger.info("Бот запущен.")
     app.run_polling()

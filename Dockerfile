@@ -1,9 +1,8 @@
 FROM python:3.11-slim
 
-# Устанавливаем системные зависимости
-RUN apt-get update && apt-get install -y \
-    libpq-dev gcc ffmpeg libsm6 libxext6 && \
-    apt-get clean
+# Для получения кадра из RTSP нужен только FFmpeg.
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 
 # Создаём рабочую директорию
 WORKDIR /app
@@ -11,9 +10,7 @@ WORKDIR /app
 # Копируем зависимости
 COPY requirements.txt requirements.txt
 
-# Устанавливаем зависимости проекта и OpenCV
-RUN pip install --no-cache-dir -r requirements.txt \
-    && pip install --no-cache-dir opencv-python-headless
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Копируем код приложения
 COPY . .

@@ -21,7 +21,6 @@ venv/
 # Docker
 *.pid
 docker-compose.override.yml
-.dockerignore
 
 # OS files
 .DS_Store
