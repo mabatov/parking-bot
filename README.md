@@ -1,73 +1,61 @@
-### 🅿️ Parking Bot  
+# Parking Bot
 
-A **Telegram bot** for monitoring parking spots using an **IP camera**. The bot captures real-time images from an **RTSP stream** and sends them to a Telegram chat, helping users find available parking spots faster.  
+Telegram-бот для снимков дворовой парковки с IP-камеры. `/photo` отправляет
+текущий кадр; `/parking` оценивает занятость видимых мест и подсвечивает их на
+снимке. Вторая команда использует OpenAI API и включается только при наличии
+ключа.
 
----
+## Как устроен
 
-## 🚀 Features  
-✅ Capture real-time images from an **IP camera**  
-✅ Send images to a **Telegram chat**  
-✅ **Fast and lightweight** – works in a Docker container  
-✅ **Secure access** – only authorized users can request images  
-
----
-
-## 🏗️ Technologies Used  
-- **Backend**: Python, `python-telegram-bot`, FFmpeg  
-- **Database**: PostgreSQL  
-- **Containerization**: Docker, Docker Compose  
-
----
-
-## 🔧 Installation & Setup  
-
-### 1️⃣ Clone the Repository  
-```bash
-git clone https://github.com/mabatov/parking-bot.git
-cd parking-bot
+```mermaid
+flowchart TD
+    U[Пользователь Telegram] --> B[bot.py]
+    B --> D[(PostgreSQL: доступ)]
+    B --> C[camera.py: RTSP через FFmpeg]
+    C --> P["/photo: снимок"]
+    C --> A[parking_analysis.py: OpenAI API]
+    A --> R["/parking: снимок с оценкой"]
 ```
 
-### 2️⃣ Configure the Bot  
-Create an `.env` file with the following variables:  
-```ini
-bot_token=your_telegram_bot_token
-logging_bot_token=your_logging_telegram_bot_token
-rtsp_url=rtsp://user:password@camera-ip:port/stream1
-admin_telegram_id=telegram_id_of_admin
+Бот получает обновления Telegram через long polling. PostgreSQL содержит только
+список разрешённых Telegram ID; администратор имеет доступ по
+`admin_telegram_id` и управляет списком командами `/add_user <id>`,
+`/remove_user <id>`, `/list_users`. Кадр передаётся в памяти, история кадров и
+оценок не сохраняется. Отдельный Telegram-бот пересылает администратору события
+по `logging_bot_token`.
 
-db_user=db_name
-db_password=db_password
-db_host=localhost
-db_port=5432
-db_name=parking_bot
-```
+## Запуск
 
-### 3️⃣ Run with Docker  
-```bash
-docker-compose up -d
-```
+1. Скопируйте `.env.example` в `.env` и заполните токены, Telegram ID
+   администратора и адрес RTSP-камеры. `.env` не добавляйте в Git.
+2. Для анализа снимка дополнительно укажите `openai_api_key`. Подписка ChatGPT
+   не оплачивает вызовы OpenAI API: нужен отдельный ключ и баланс API.
+3. Запустите `docker compose up -d --build`.
 
----
+В текущем `docker-compose.yml` база создаётся с `postgres` / `postgres` и
+именем `parking_bot`; поэтому значения `db_user`, `db_password`, `db_name` в
+`.env` должны им соответствовать, а `db_host` внутри контейнера равен `db`.
+При существующем томе PostgreSQL смена переменных Compose сама по себе не
+меняет пароль пользователя базы.
 
-## 📸 How It Works  
-1️⃣ User sends a command to the bot (e.g., `/photo`)  
-2️⃣ The bot **validates access** (checks if the user is authorized)  
-3️⃣ The bot **fetches an image** from the RTSP stream using `FFmpeg`  
-4️⃣ The bot **sends the image** back to the Telegram chat  
+### Команды
 
----
+- `/start` — показать кнопки доступному пользователю.
+- `/photo` — получить свежий кадр без анализа и внешнего AI-запроса.
+- `/parking` — получить свежий кадр, оценку занятости и подсветку мест.
 
-## 🛠️ Future Improvements  
-🔹 **Computer vision** – automatically detect free parking spots  
-🔹 **Web interface** – monitor the parking lot from a browser  
-🔹 **Notification system** – get alerts when a parking spot is available  
+Один запрос `/parking` отправляет кадр в OpenAI API и расходует платные токены.
+Глобальный интервал между запросами задаётся `parking_cooldown_seconds` (по
+умолчанию 60 секунд). Анализ не делает парковку законной и не гарантирует
+наличия места: модель может ошибаться в числе мест, границах и статусе, особенно
+ночью, под снегом и при перекрытии обзора. Жёлтый цвет означает «неясно»;
+оценка уверенности самой модели не является измеренной точностью. Места
+определяются заново на каждом кадре и не имеют постоянных номеров.
 
----
+Для надёжного подсчёта именно **ваших** мест следующим шагом нужен пример кадра
+с камеры и размеченные постоянные зоны парковки. На нескольких дневных и ночных
+снимках можно сравнить результат с фактом и выбрать порог и способ распознавания.
 
-## 📜 License  
-This project is licensed under the **MIT License** – feel free to use and modify it! 🚀  
-
----
-
-## ✉️ Contact  
-📬 Have questions or suggestions? Open an **issue** or reach out via [Telegram](https://t.me/nvmabatov)!
+Документация: [визуальный ввод](https://developers.openai.com/api/docs/guides/images-vision),
+[структурированный вывод](https://developers.openai.com/api/docs/guides/structured-outputs),
+[тарифы OpenAI API](https://openai.com/api/pricing/).

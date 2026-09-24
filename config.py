@@ -7,6 +7,9 @@ class Settings(BaseSettings):
     bot_token: str
     logging_bot_token: str
     rtsp_url: str
+    openai_api_key: str | None = None
+    openai_model: str = "gpt-4.1-mini"
+    parking_cooldown_seconds: int = 60
 
     db_user: str
     db_password: str
